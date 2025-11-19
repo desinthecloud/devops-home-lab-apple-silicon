@@ -1,0 +1,9 @@
+---
+- name: Configure Nginx container
+  hosts: web
+  become: false
+  tasks:
+    - name: Print message from Ansible
+      debug:
+        msg: "Ansible successfully connected to the container"
+

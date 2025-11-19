@@ -1,0 +1,20 @@
+cat > .gitignore << 'EOF'
+# macOS
+.DS_Store
+.AppleDouble
+.Icon?
+*.swp
+
+# Vagrant
+.vagrant/
+*.box
+
+# Logs
+*.log
+
+# IDE/editor
+.vscode/
+.idea/
+*.iml
+EOF
+
