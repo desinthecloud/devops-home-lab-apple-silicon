@@ -1,52 +1,80 @@
+import os
 import json
-import datetime
+import logging
+from decimal import Decimal
+
+import boto3
+from boto3.dynamodb.conditions import Key
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+dynamodb = boto3.resource("dynamodb")
+INSIGHTS_TABLE_NAME = os.getenv("INSIGHTS_TABLE_NAME", "")
+
+def _get_latest_insights():
+    if not INSIGHTS_TABLE_NAME:
+        logger.error("INSIGHTS_TABLE_NAME env var is not set")
+        return None
+
+    table = dynamodb.Table(INSIGHTS_TABLE_NAME)
+
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq("run_insights"),
+        ScanIndexForward=False,  # newest first
+        Limit=1,
+    )
+
+    items = resp.get("Items", [])
+    if not items:
+        return None
+
+    return items[0]
+
+def _decimal_to_float(obj):
+    """
+    Recursively convert Decimal objects to float so json.dumps doesn't explode.
+    """
+    if isinstance(obj, list):
+        return [_decimal_to_float(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _decimal_to_float(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return float(obj)
+    return obj
 
 def lambda_handler(event, context):
-    """
-    Stubbed insights handler:
-    Returns a hard-coded sample insights payload for now.
-    """
-    now = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    logger.info("GetInsightsFunction invoked with event: %s", json.dumps(event))
 
-    sample_response = {
-        "run_date": now,
-        "total_spend": 1234.56,
-        "previous_period_spend": 1100.00,
-        "spend_delta_pct": 12.25,
-        "summary": "Your AWS spend increased 12% compared to the previous period, mainly driven by EC2 and S3.",
-        "top_recommendations": [
-            {
-                "id": "rec-ec2-1",
-                "category": "EC2 Right-Sizing",
-                "description": "Downsize three t3.2xlarge instances in the prod-app cluster to t3.xlarge based on <10% average CPU.",
-                "estimated_savings_monthly": 245.30,
-                "urgency": "HIGH",
-                "confidence": 0.87
-            },
-            {
-                "id": "rec-s3-1",
-                "category": "S3 Storage Class Optimization",
-                "description": "Move infrequently accessed objects from s3://logs-prod-archive to S3 Glacier Instant Retrieval.",
-                "estimated_savings_monthly": 80.00,
-                "urgency": "MEDIUM",
-                "confidence": 0.78
-            }
-        ],
-        "raw_findings": {
-            "by_service": [
-                { "service": "AmazonEC2", "cost": 765.43 },
-                { "service": "AmazonRDS", "cost": 250.11 },
-                { "service": "AmazonS3", "cost": 120.10 }
-            ],
-            "anomalies": [
-                {
-                    "service": "AmazonS3",
-                    "delta_pct": 45.2,
-                    "reason": "Cost increased after enabling access logs on logs-prod-archive."
-                }
-            ]
+    item = _get_latest_insights()
+
+    if not item:
+        body = {
+            "error": "NO_DATA",
+            "message": "No insights found yet. Run the cost analyzer first."
         }
+        return {
+            "statusCode": 404,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            "body": json.dumps(body)
+        }
+
+    # Build response body from DynamoDB item
+    response_body = {
+        "run_date": item.get("run_date"),
+        "total_spend": item.get("total_spend", 0),
+        "previous_period_spend": item.get("previous_period_spend", 0),
+        "spend_delta_pct": item.get("spend_delta_pct", 0),
+        "summary": item.get("summary", ""),
+        "top_recommendations": item.get("top_recommendations", []),
+        "raw_findings": item.get("raw_findings", {"by_service": [], "anomalies": []}),
     }
+
+    # Normalize all Decimals → float
+    response_body = _decimal_to_float(response_body)
 
     return {
         "statusCode": 200,
@@ -54,5 +82,5 @@ def lambda_handler(event, context):
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*"
         },
-        "body": json.dumps(sample_response)
+        "body": json.dumps(response_body)
     }
