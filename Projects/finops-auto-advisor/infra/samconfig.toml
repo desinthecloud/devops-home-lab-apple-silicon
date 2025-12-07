@@ -1,9 +1,9 @@
 version = 0.1
 
 [dev.deploy.parameters]
-stack_name = "finops-auto-advisor-dev"
+stack_name = "finops-auto-advisor"
 resolve_s3 = true
-s3_prefix = "finops-auto-advisor-dev"
+s3_prefix = "finops-auto-advisor"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
