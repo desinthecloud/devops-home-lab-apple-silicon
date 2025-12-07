@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  FinOps Auto-Advisor - Serverless backbone (DynamoDB, Lambdas, Http API, Schedule)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Handler: app.lambda_handler
+
+Parameters:
+  InsightsTableName:
+    Type: String
+    Default: FinopsInsights
+  EnvironmentName:
+    Type: String
+    Default: dev
+
+Resources:
+  InsightsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${InsightsTableName}-${EnvironmentName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref EnvironmentName
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+        AllowHeaders:
+          - '*'
+
+  CostAnalyzerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "finops-cost-analyzer-${EnvironmentName}"
+      CodeUri: ../backend/lambdas/cost_analyzer/
+      Description: "Scheduled Lambda that will analyze CUR data (stubbed for now)."
+      Environment:
+        Variables:
+          INSIGHTS_TABLE_NAME: !Ref InsightsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InsightsTable
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Name: !Sub "finops-cost-analyzer-schedule-${EnvironmentName}"
+            Description: "Daily trigger for cost analyzer."
+
+  GetInsightsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "finops-get-insights-${EnvironmentName}"
+      CodeUri: ../backend/lambdas/get_insights/
+      Description: "API handler that returns latest insights (stubbed sample response)."
+      Environment:
+        Variables:
+          INSIGHTS_TABLE_NAME: !Ref InsightsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref InsightsTable
+      Events:
+        HttpApiEvent:
+          Type: HttpApi
+          Properties:
+            Path: /insights
+            Method: GET
+            ApiId: !Ref HttpApi
+
+Outputs:
+  HttpApiUrl:
+    Description: "Base URL for the FinOps Auto-Advisor HTTP API"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}"

@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# SAM build artifacts
+.aws-sam/
+
+# macOS
+.DS_Store
+
+# Streamlit
+frontend/.streamlit/secrets.toml

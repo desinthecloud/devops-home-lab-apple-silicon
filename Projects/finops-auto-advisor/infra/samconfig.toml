@@ -1,0 +1,12 @@
+version = 0.1
+
+[dev.deploy.parameters]
+stack_name = "finops-auto-advisor-dev"
+resolve_s3 = true
+s3_prefix = "finops-auto-advisor-dev"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "InsightsTableName=\"FinopsInsights\" EnvironmentName=\"dev\""
+image_repositories = []
