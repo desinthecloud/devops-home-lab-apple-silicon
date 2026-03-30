@@ -1,10 +1,6 @@
-Here’s a clean, final, **copy-paste-ready README.md** for your repo — polished, recruiter-friendly, and structured like a real DevOps project built on Apple Silicon.
 
-No meta talk. No extra commentary. Just the file.
 
----
-
-# **README.md (Final Version)**
+# **README.md**
 
 ```markdown
 # DevOps Home Lab – Apple Silicon Edition
